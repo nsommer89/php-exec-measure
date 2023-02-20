@@ -4,7 +4,11 @@ if (php_sapi_name() !== 'cli') {
     exit(1);
 }
 
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../src/MeasurementInterface.php';
+require_once __DIR__ . '/../src/Measurement.php';
+require_once __DIR__ . '/../src/SimpleMeasurement.php';
+require_once __DIR__ . '/../src/MeasurementResultInterface.php';
+require_once __DIR__ . '/../src/MeasurementResult.php';
 
 use Nsommer89\PhpExecMeasure\SimpleMeasurement;
 
