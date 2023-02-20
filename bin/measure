@@ -1,0 +1,77 @@
+#!/usr/bin/env php
+<?php
+if (php_sapi_name() !== 'cli') {
+    exit(1);
+}
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Nsommer89\PhpExecMeasure\SimpleMeasurement;
+
+$options = getopt('f:j:i:o:', ['file:', 'json', 'ignore-errors', 'output']);
+
+// Validate file
+if (empty($options['f']) && empty($options['file'])) {
+    echo 'Please provide a file to measure with -f or --file' . PHP_EOL;
+    exit(1);
+}
+
+$file_path = __DIR__ . '/../' . $options['f'] ?? $options['file'] ?? null;
+$as_json = isset($options['j']) || isset($options['json']);
+$ignore_errors = isset($options['i']) || isset($options['ignore-errors']);
+
+if ($file_path !== null && !file_exists($file_path)) {
+    echo 'File does not exist' . PHP_EOL;
+    exit(1);
+}
+
+if ($file_path !== null && pathinfo($file_path, PATHINFO_EXTENSION) !== 'php') {
+    echo 'File is not a PHP file' . PHP_EOL;
+    exit(1);
+}
+
+$measurement = new SimpleMeasurement();
+
+($measurement)->fn(function () use ($file_path, $as_json, $ignore_errors) {
+    try {
+        if ($ignore_errors) {
+            ob_start();
+        }
+        
+        if (!$as_json) {
+            $output = require $file_path;
+        } else {
+            // run php file in another process and redirect stderr to stdout
+            $output = exec('php ' . $file_path . ' 2>&1', $output, $return_var);
+        }
+    } catch (Throwable $e) {
+        if (!$ignore_errors) {
+            echo PHP_EOL . 'PHP Fatal error:  Uncaught Exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL;
+            echo $e->getTraceAsString() . PHP_EOL;
+            // continue execution as we want to print the result of the measurement
+        }
+    }
+});
+
+$result = $measurement->getResult();
+
+if ($as_json) {
+    echo json_encode($result->toArray());
+}
+
+if (!$as_json) {
+    echo PHP_EOL . 'Execution time: ' . $result->getDuration() . ' seconds' . PHP_EOL;
+}
+
+$log_file_name = 'log_' . time() . '.log';
+if (isset($options['o']) || isset($options['output']) ? true : false) {
+    if (!empty($options['o']) || !empty($options['output'])) {
+        $log_file_name = $options['o'] ?? $options['output'] ?? $log_file_name;
+    }
+    if (!file_exists(__DIR__ . '/../logs')) {
+        mkdir(__DIR__ . '/../logs');
+    }
+    $contents = ob_get_contents();
+    file_put_contents(__DIR__ . '/../logs/' . $log_file_name, $contents);
+}
+exit(0);
